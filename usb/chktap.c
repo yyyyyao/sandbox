@@ -88,14 +88,30 @@ void USB_altinterface(struct usb_dev_handle *dh,int tyep)
         }
 }
 
+void print_usage_and_exit(void) {
+  fprintf(stderr, "usage ./chktap [ON/OFF]\n");
+  exit(1);
+}
+
 int main(int argc, char *argv[])
 {
         struct usb_bus *bus;
         struct usb_device *dev;
         usb_dev_handle *dh;
 
+        int result;
         unsigned char writeStatus[8] = {0xc1,0,0,0,0,0,0,0};
-        unsigned char readStatus[8];
+
+        if(argc != 2)
+          print_usage_and_exit();
+
+        if(!strcmp(argv[1], "ON"))
+            writeStatus[4] = 0x31;
+        else if(!strcmp(argv[1], "OFF"))
+            writeStatus[4] = 0x32;
+        else
+          print_usage_and_exit();
+
 
         /* Initialize */
         bus=USB_init();
@@ -104,7 +120,7 @@ int main(int argc, char *argv[])
                 fprintf(stderr,"Device not found\n");
                  exit(1); 
         }
-        printf("Initialize OK\n");
+        printf("Initialize and find OK\n");
         /*-------------*/
         /* Device Open */
         /*-------------*/
@@ -112,27 +128,13 @@ int main(int argc, char *argv[])
         if( dh==NULL ){ exit(2); }
         printf("Device Open OK\n");
 
-        if(argc == 2){
-	    if(!strcmp(argv[1], "ON"))
-		writeStatus[4] = 0x31;
-	    else if(!strcmp(argv[1], "OFF"))
-		writeStatus[4] = 0x32;
-	    else
-		writeStatus[4] = 0x32;
+          
+        result = usb_control_msg(dh, 0x21, 0x9, 0x200, 0x0, writeStatus, 8, TIMEOUT);
+        if(result < 0){
+	    printf ("Control message error. (%d:%s)\n", result, usb_strerror());
+            USB_close(dh);
+            exit(1);
 	}
-
-        int result = usb_bulk_write(dh, 0x81, writeStatus, sizeof(writeStatus), TIMEOUT);
-        //int result = usb_bulk_read(dh, 0x01, writeStatus, sizeof(readStatus), TIMEOUT);
-        //if(result < 0){
-	//    printf ("Control message error. (%d:%s)\n", result, usb_strerror());
-        //    USB_close(dh);
-	//}
-        printf("message...");
-        memset(readStatus, 0, sizeof(unsigned char)*9);
-        result = usb_bulk_read(dh, 0x81, readStatus, sizeof(readStatus), TIMEOUT);
-        if(result<0){printf ("Control message error. (%d:%s)\n", result, usb_strerror());}
-        printf("%s\n", readStatus);
-
         printf("USB Close\n");
         USB_close(dh);
         printf("USB End\n");
